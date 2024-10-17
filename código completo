@@ -1,0 +1,73 @@
+import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
+import android.content.pm.PackageManager
+import android.content.Intent
+import android.provider.Settings
+
+class AudioHelper(context: Context) {
+
+    private val audioManager: AudioManager =
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    // Verifica se uma saída de áudio está disponível
+    fun audioOutputAvailable(type: Int): Boolean {
+        if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUDIO_OUTPUT)) {
+            return false
+        }
+        return audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type == type }
+    }
+}
+
+// Uso no aplicativo principal
+fun main(context: Context) {
+    val audioHelper = AudioHelper(context)
+
+    val isSpeakerAvailable =
+        audioHelper.audioOutputAvailable(AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
+    println("Alto-falante disponível: $isSpeakerAvailable")
+
+    val isBluetoothHeadsetConnected =
+        audioHelper.audioOutputAvailable(AudioDeviceInfo.TYPE_BLUETOOTH_A2DP)
+    println("Fone Bluetooth conectado: $isBluetoothHeadsetConnected")
+}
+
+// Detectar adição e remoção de dispositivos de áudio
+fun registerAudioDeviceCallback(context: Context) {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    audioManager.registerAudioDeviceCallback(object : AudioManager.AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+            super.onAudioDevicesAdded(addedDevices)
+            println("Dispositivo de áudio adicionado")
+            // Verificar se um fone Bluetooth foi conectado
+            if (audioOutputAvailable(context, AudioDeviceInfo.TYPE_BLUETOOTH_A2DP)) {
+                println("Fone Bluetooth conectado")
+            }
+        }
+
+        override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+            super.onAudioDevicesRemoved(removedDevices)
+            println("Dispositivo de áudio removido")
+            if (!audioOutputAvailable(context, AudioDeviceInfo.TYPE_BLUETOOTH_A2DP)) {
+                println("Fone Bluetooth desconectado")
+            }
+        }
+    }, null)
+}
+
+fun audioOutputAvailable(context: Context, type: Int): Boolean {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    return audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type == type }
+}
+
+// Abrir configurações de Bluetooth para conectar dispositivo
+fun openBluetoothSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        putExtra("EXTRA_CONNECTION_ONLY", true)
+        putExtra("EXTRA_CLOSE_ON_CONNECT", true)
+        putExtra("android.bluetooth.devicepicker.extra.FILTER_TYPE", 1)
+    }
+    context.startActivity(intent)
+}
